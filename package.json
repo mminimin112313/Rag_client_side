@@ -10,6 +10,7 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./scripts/build-from-documents": "./scripts/build-from-documents.mjs",
     "./scripts/build-vector-db": "./scripts/build-vector-db.mjs",
     "./scripts/encrypt-content": "./scripts/encrypt-content.mjs"
   },

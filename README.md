@@ -1,103 +1,99 @@
 # Rag Client Side SDK
 
-Browser-first RAG SDK that can be attached to any frontend application and also reused in local app runtimes.
+Any-application client-side RAG SDK.
 
-## What This SDK Includes
+You can attach this to web apps, desktop wrappers, and local frontends without server-side vector DB.
 
-- Client-side encrypted content loading and decryption (`content.enc.json`, page-wise encrypted files)
-- BM25-weighted retrieval with vector search
-- Optional Rust WASM embedder (`rag_embedding_wasm.js`) with automatic JS fallback
-- Data preparation pipeline from markdown/qa to deployable assets
+## Core Goal
 
-## Install
+- Input your own documents.
+- Build encrypted RAG assets.
+- Mount search to frontend with one client object.
 
-```bash
-npm install
-npm run build
+## 1) Prepare Documents
+
+Create `rag-documents.json`:
+
+```json
+{
+  "documents": [
+    {
+      "id": "refund-policy",
+      "title": "Refund Policy",
+      "text": "Customers can request refund within 7 days ..."
+    },
+    {
+      "id": "shipping",
+      "title": "Shipping Guide",
+      "text": "Domestic shipping takes 2-3 business days ..."
+    }
+  ]
+}
 ```
 
-## Data Pipeline (Any App)
+Or initialize a sample:
 
-Prepare input:
+```bash
+node scripts/rag-client-sdk.mjs init --input ./rag-documents.json
+```
 
-- `docs/markdown/**/*.md`
-- `docs/qa/**/*.json`
-
-Build encrypted dataset + vector index:
+## 2) Build RAG Assets
 
 ```bash
 WIKI_PASSWORD='your-password' node scripts/rag-client-sdk.mjs prepare \
-  --source ./docs \
-  --md markdown \
-  --qa qa \
+  --input ./rag-documents.json \
   --output ./public
 ```
 
-Generated outputs:
+Outputs:
 
 - `public/content.enc.json`
 - `public/content/pages/*.enc.json`
 - `public/vector-db.json`
-- `public/vector-db-vectors.bin.enc` (when `--encrypt-vectors true`, default)
+- `public/vector-db-vectors.bin.enc`
 
-## Runtime Usage (Frontend)
-
-```ts
-import { decryptPayloadToJson, searchVectorIndexAsync, type VectorSearchIndex } from '@mminimin112313/rag-client-side';
-
-async function runSearch(password: string, query: string) {
-  const res = await fetch('/vector-db.json');
-  const payload = await res.json();
-
-  let index = payload as VectorSearchIndex;
-  if (payload?.salt && payload?.iv && payload?.ciphertext) {
-    index = await decryptPayloadToJson<VectorSearchIndex>(password, payload);
-  }
-
-  return searchVectorIndexAsync(index, query, { limit: 10, minScore: 0.01 });
-}
-```
-
-## WASM vs Non-WASM
-
-Default behavior:
-
-- Tries to load `/pkg/rag_embedding_wasm.js`
-- If not found, falls back to JS hashing embedder automatically
-
-If your app hosts WASM in a custom path:
+## 3) Mount on Frontend
 
 ```ts
-import { setWasmModulePath } from '@mminimin112313/rag-client-side';
+import { createWebRagClient } from '@mminimin112313/rag-client-side';
 
-setWasmModulePath('/assets/wasm/rag_embedding_wasm.js');
+const rag = createWebRagClient({
+  indexUrl: '/vector-db.json',
+  password: userInputPassword,
+  wasmModulePath: '/pkg/rag_embedding_wasm.js',
+});
+
+const hits = await rag.search('refund deadline', { limit: 8, minScore: 0.01 });
 ```
 
-## API Surface
+## WASM Optional
 
-Main exports:
+- If WASM exists, SDK uses it.
+- If WASM is missing, SDK automatically falls back to JS embedder.
 
-- `decryptPayload`, `decryptPayloadToJson`, `decryptPayloadBytes`
-- `calculateBM25WeightsFromTokens`, `requireBm25Stats`
-- `loadPrebuiltVectorIndex`, `searchVectorIndexAsync`
-- `buildContentNavigationPlan`, `normalizeContentForChunking`
-- `setWasmModulePath`, `getWasmEngine`, `initWasmEngine`
+## Works Across App Types
 
-## Local App / Electron / Tauri Notes
+- Next.js, React, Vue, Svelte web apps
+- Electron/Tauri desktop apps (serve same `public` assets locally)
+- Any browser runtime with `fetch + WebCrypto`
 
-- This SDK is pure TypeScript ESM at runtime output (`dist`) and can run in browser-like contexts.
-- For desktop wrappers (Electron/Tauri), serve generated assets from local static path and call the same SDK APIs.
-- Keep encryption password in runtime input flow, not hardcoded.
-
-## Quick Start Commands
+## CLI Summary
 
 ```bash
-# 1) initialize docs skeleton
-node scripts/rag-client-sdk.mjs init --source ./docs --md markdown --qa qa
+# sample input
+node scripts/rag-client-sdk.mjs init --input ./rag-documents.json
 
-# 2) prepare encrypted deploy assets
-WIKI_PASSWORD='your-password' node scripts/rag-client-sdk.mjs prepare --source ./docs --output ./public
+# build from documents.json
+WIKI_PASSWORD='your-password' node scripts/rag-client-sdk.mjs prepare --input ./rag-documents.json --output ./public
 
-# 3) compile sdk package
-npm run build
+# legacy path (markdown folders)
+WIKI_PASSWORD='your-password' node scripts/rag-client-sdk.mjs prepare --source ./docs --md markdown --qa qa --output ./public
 ```
+
+## Exports
+
+- `createWebRagClient`
+- `loadPrebuiltVectorIndex`, `searchVectorIndexAsync`
+- `decryptPayload`, `decryptPayloadToJson`, `decryptPayloadBytes`
+- `setWasmModulePath`, `getWasmEngine`, `initWasmEngine`
+- `calculateBM25WeightsFromTokens`, `requireBm25Stats`

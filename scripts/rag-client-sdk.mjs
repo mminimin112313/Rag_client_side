@@ -41,11 +41,12 @@ function printUsage() {
 rag-client-sdk
 
 Usage:
-  node scripts/rag-client-sdk.mjs init [--source ./docs] [--md markdown] [--qa qa]
+  node scripts/rag-client-sdk.mjs init [--input ./rag-documents.json]
   node scripts/rag-client-sdk.mjs prepare [--source ./docs] [--md markdown] [--qa qa] [--output ./public] [--password ...] [--password-env WIKI_PASSWORD] [--encrypt-vectors true|false]
+  node scripts/rag-client-sdk.mjs prepare [--input ./rag-documents.json] [--output ./public] [--password ...] [--password-env WIKI_PASSWORD] [--encrypt-vectors true|false]
 
 Examples:
-  WIKI_PASSWORD='secret' node scripts/rag-client-sdk.mjs prepare --source ./docs --output ./public
+  WIKI_PASSWORD='secret' node scripts/rag-client-sdk.mjs prepare --input ./rag-documents.json --output ./public
   node scripts/rag-client-sdk.mjs prepare --source ./docs --password secret --encrypt-vectors true
 `);
 }
@@ -64,16 +65,27 @@ function main() {
     }
 
     const source = path.resolve(process.cwd(), args.source || './docs');
+    const input = path.resolve(process.cwd(), args.input || './rag-documents.json');
     const md = args.md || 'markdown';
     const qa = args.qa || 'qa';
     const output = path.resolve(process.cwd(), args.output || './public');
 
     if (command === 'init') {
-        fs.mkdirSync(path.join(source, md), { recursive: true });
-        fs.mkdirSync(path.join(source, qa), { recursive: true });
-        console.log(`Initialized source root: ${source}`);
-        console.log(`Markdown: ${path.join(source, md)}`);
-        console.log(`QA: ${path.join(source, qa)}`);
+        if (!fs.existsSync(input)) {
+            const sample = {
+                documents: [
+                    {
+                        id: 'getting-started',
+                        title: 'Getting Started',
+                        text: 'Put any plain text here. This SDK will build encrypted content and vector index for browser retrieval.'
+                    }
+                ]
+            };
+            fs.writeFileSync(input, `${JSON.stringify(sample, null, 2)}\n`, 'utf-8');
+            console.log(`Initialized input: ${input}`);
+        } else {
+            console.log(`Input already exists: ${input}`);
+        }
         return;
     }
 
@@ -85,30 +97,41 @@ function main() {
             env[passwordEnvName] = password;
         }
 
-        run(process.execPath, [
-            path.resolve('scripts/encrypt-content.mjs'),
-            `--source=${source}`,
-            `--md=${md}`,
-            `--qa=${qa}`,
-            `--output=${output}`,
-            `--password-env=${passwordEnvName}`,
-            ...(password ? [`--password=${password}`] : []),
-        ], process.cwd(), env);
-
         const encryptVectors = toBool(args['encrypt-vectors'], true);
-        run(process.execPath, [
-            path.resolve('scripts/build-vector-db.mjs'),
-            `--source=${source}`,
-            `--md=${md}`,
-            `--output=${output}`,
-            '--out=vector-db.json',
-            '--dim=256',
-            '--chunk-size=220',
-            '--chunk-overlap=30',
-            ...(encryptVectors ? ['--encrypt'] : []),
-            `--password-env=${passwordEnvName}`,
-            ...(password ? [`--password=${password}`] : []),
-        ], process.cwd(), env);
+        if (args.input) {
+            run(process.execPath, [
+                path.resolve('scripts/build-from-documents.mjs'),
+                `--input=${input}`,
+                `--output=${output}`,
+                `--password-env=${passwordEnvName}`,
+                `--encrypt-vectors=${encryptVectors ? 'true' : 'false'}`,
+                ...(password ? [`--password=${password}`] : []),
+            ], process.cwd(), env);
+        } else {
+            run(process.execPath, [
+                path.resolve('scripts/encrypt-content.mjs'),
+                `--source=${source}`,
+                `--md=${md}`,
+                `--qa=${qa}`,
+                `--output=${output}`,
+                `--password-env=${passwordEnvName}`,
+                ...(password ? [`--password=${password}`] : []),
+            ], process.cwd(), env);
+
+            run(process.execPath, [
+                path.resolve('scripts/build-vector-db.mjs'),
+                `--source=${source}`,
+                `--md=${md}`,
+                `--output=${output}`,
+                '--out=vector-db.json',
+                '--dim=256',
+                '--chunk-size=220',
+                '--chunk-overlap=30',
+                ...(encryptVectors ? ['--encrypt'] : []),
+                `--password-env=${passwordEnvName}`,
+                ...(password ? [`--password=${password}`] : []),
+            ], process.cwd(), env);
+        }
 
         console.log('Prepared encrypted content + vector index.');
         return;
