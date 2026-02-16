@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mminimin112313.github.io/rag-client-side/rag-documents.schema.json",
+  "title": "RAG Documents Input",
+  "description": "Canonical input schema for Rag Client Side SDK",
+  "type": "object",
+  "required": ["documents"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Input format version"
+    },
+    "documents": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "text"],
+        "additionalProperties": true,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Stable unique document id"
+          },
+          "title": {
+            "type": "string",
+            "description": "Display title"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Raw content text used for chunking and retrieval"
+          },
+          "path": {
+            "type": "string",
+            "description": "Optional logical path for UI grouping"
+          },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "ISO-8601 timestamp"
+          }
+        }
+      }
+    }
+  }
+}

@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
+import { validateDocumentsPayload } from './lib/document-utils.mjs';
 
 function parseArgs(argv) {
     const out = {};
@@ -35,22 +36,7 @@ function run(command, args, env) {
 }
 
 function slugify(input) {
-    return `${input || ''}`
-        .toLowerCase()
-        .replace(/[^a-z0-9가-힣]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        || 'doc';
-}
-
-function normalizeDocuments(raw) {
-    const docs = Array.isArray(raw) ? raw : (Array.isArray(raw?.documents) ? raw.documents : []);
-    return docs
-        .map((item, i) => ({
-            id: `${item?.id ?? i + 1}`,
-            title: `${item?.title ?? `Document ${i + 1}`}`,
-            text: `${item?.text ?? ''}`,
-        }))
-        .filter((item) => item.text.trim().length > 0);
+    return `${input || ''}`.toLowerCase().replace(/[^a-z0-9가-힣]+/g, '-').replace(/^-+|-+$/g, '') || 'doc';
 }
 
 function main() {
@@ -68,10 +54,14 @@ function main() {
     }
 
     const raw = JSON.parse(fs.readFileSync(inputPath, 'utf-8'));
-    const documents = normalizeDocuments(raw);
-    if (!documents.length) {
-        throw new Error('No documents found in input. Expected array or { documents: [] }.');
+    const validated = validateDocumentsPayload(raw);
+    if (!validated.ok) {
+        for (const error of validated.errors) {
+            console.error(`- ${error}`);
+        }
+        process.exit(1);
     }
+    const documents = validated.documents;
 
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rag-client-docs-'));
     const mdRoot = path.join(tempRoot, mdDirName);

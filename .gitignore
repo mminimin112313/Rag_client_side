@@ -9,3 +9,5 @@ public/vector-db.json
 public/vector-db-vectors.bin
 public/vector-db-vectors.bin.enc
 public/content.enc.json
+rag-documents.json
+tmp

@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "documents": [
+    {
+      "id": "faq-refund",
+      "title": "Refund FAQ",
+      "text": "Refund requests are accepted within 7 days after purchase.",
+      "path": "support/refund",
+      "tags": ["policy", "faq"],
+      "metadata": {
+        "lang": "en",
+        "source": "crm"
+      },
+      "updatedAt": "2026-02-16T00:00:00Z"
+    }
+  ]
+}

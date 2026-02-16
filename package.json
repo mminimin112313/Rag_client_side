@@ -11,12 +11,17 @@
       "default": "./dist/index.js"
     },
     "./scripts/build-from-documents": "./scripts/build-from-documents.mjs",
+    "./scripts/build-wasm": "./scripts/build-wasm.mjs",
+    "./scripts/ingest-any": "./scripts/ingest-any.mjs",
+    "./scripts/validate-documents": "./scripts/validate-documents.mjs",
     "./scripts/build-vector-db": "./scripts/build-vector-db.mjs",
     "./scripts/encrypt-content": "./scripts/encrypt-content.mjs"
   },
   "files": [
     "dist",
     "scripts",
+    "schemas",
+    "examples",
     "README.md",
     "LICENSE"
   ],
@@ -24,7 +29,10 @@
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist",
     "sdk:init": "node scripts/rag-client-sdk.mjs init",
+    "sdk:ingest": "node scripts/rag-client-sdk.mjs ingest",
+    "sdk:validate": "node scripts/rag-client-sdk.mjs validate",
     "sdk:prepare": "node scripts/rag-client-sdk.mjs prepare",
+    "sdk:build-wasm": "node scripts/rag-client-sdk.mjs build-wasm",
     "prepare:data": "node scripts/rag-client-sdk.mjs prepare"
   },
   "keywords": [

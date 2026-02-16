@@ -42,12 +42,17 @@ rag-client-sdk
 
 Usage:
   node scripts/rag-client-sdk.mjs init [--input ./rag-documents.json]
+  node scripts/rag-client-sdk.mjs ingest --from ./raw-input --type json|jsonl|csv|md-dir|txt-dir [--out ./rag-documents.json]
+  node scripts/rag-client-sdk.mjs validate [--input ./rag-documents.json]
   node scripts/rag-client-sdk.mjs prepare [--source ./docs] [--md markdown] [--qa qa] [--output ./public] [--password ...] [--password-env WIKI_PASSWORD] [--encrypt-vectors true|false]
   node scripts/rag-client-sdk.mjs prepare [--input ./rag-documents.json] [--output ./public] [--password ...] [--password-env WIKI_PASSWORD] [--encrypt-vectors true|false]
+  node scripts/rag-client-sdk.mjs build-wasm [--rust-source ../rag-gemma-candle-wasm] [--out ./public/pkg] [--docker true|false]
 
 Examples:
+  node scripts/rag-client-sdk.mjs ingest --from ./knowledge.jsonl --type jsonl --out ./rag-documents.json
   WIKI_PASSWORD='secret' node scripts/rag-client-sdk.mjs prepare --input ./rag-documents.json --output ./public
   node scripts/rag-client-sdk.mjs prepare --source ./docs --password secret --encrypt-vectors true
+  node scripts/rag-client-sdk.mjs build-wasm --rust-source ../rag-gemma-candle-wasm --out ./public/pkg
 `);
 }
 
@@ -134,6 +139,38 @@ function main() {
         }
 
         console.log('Prepared encrypted content + vector index.');
+        return;
+    }
+
+    if (command === 'ingest') {
+        const from = path.resolve(process.cwd(), args.from || args.input || './rag-documents.json');
+        const out = path.resolve(process.cwd(), args.out || './rag-documents.json');
+        run(process.execPath, [
+            path.resolve('scripts/ingest-any.mjs'),
+            `--from=${from}`,
+            ...(args.type ? [`--type=${args.type}`] : []),
+            `--out=${out}`,
+        ]);
+        return;
+    }
+
+    if (command === 'validate') {
+        run(process.execPath, [
+            path.resolve('scripts/validate-documents.mjs'),
+            `--input=${input}`,
+        ]);
+        return;
+    }
+
+    if (command === 'build-wasm') {
+        const rustSource = path.resolve(process.cwd(), args['rust-source'] || '../rag-gemma-candle-wasm');
+        const wasmOut = path.resolve(process.cwd(), args.out || './public/pkg');
+        run(process.execPath, [
+            path.resolve('scripts/build-wasm.mjs'),
+            `--rust-source=${rustSource}`,
+            `--out=${wasmOut}`,
+            ...(args.docker ? [`--docker=${args.docker}`] : []),
+        ]);
         return;
     }
 
