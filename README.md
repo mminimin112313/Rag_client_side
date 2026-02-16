@@ -68,6 +68,9 @@ node scripts/rag-client-sdk.mjs validate --input ./rag-documents.json
 ```bash
 WIKI_PASSWORD='your-password' node scripts/rag-client-sdk.mjs prepare \
   --input ./rag-documents.json \
+  --encrypt-content true \
+  --encrypt-vectors true \
+  --auto-tune true \
   --output ./public
 ```
 
@@ -77,6 +80,11 @@ Output files:
 - `public/content/pages/*.enc.json`
 - `public/vector-db.json`
 - `public/vector-db-vectors.bin.enc`
+
+Encryption toggles:
+
+- `--encrypt-content true|false`
+- `--encrypt-vectors true|false`
 
 ## Frontend Runtime
 
@@ -115,6 +123,27 @@ Runtime behavior:
 
 - WASM package present: uses Rust wasm embedder
 - WASM package absent: automatic JS fallback
+
+## Bottleneck Detection + Auto-Tune
+
+`prepare` prints per-stage timing and detects dominant bottlenecks.
+
+For large corpora, auto-tune adjusts vector params unless manually overridden:
+
+- default: `dim=256`, `chunk-size=220`, `chunk-overlap=30`
+- large corpus: reduced dimension + larger chunk to reduce compute/memory pressure
+
+Manual override:
+
+```bash
+WIKI_PASSWORD='secret' node scripts/rag-client-sdk.mjs prepare \
+  --input ./rag-documents.json \
+  --dim 128 \
+  --chunk-size 320 \
+  --chunk-overlap 40 \
+  --auto-tune false \
+  --output ./public
+```
 
 ## SDK Commands
 

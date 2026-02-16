@@ -34,6 +34,12 @@ function parseArgs(argv) {
 
 const args = parseArgs(process.argv.slice(2));
 
+function parseBoolean(value, fallback = true) {
+    if (value === undefined || value === null) return fallback;
+    if (typeof value === 'boolean') return value;
+    return !['0', 'false', 'off', 'no'].includes(String(value).toLowerCase().trim());
+}
+
 function dirExists(target) {
     return fs.existsSync(target) && fs.statSync(target).isDirectory();
 }
@@ -94,7 +100,8 @@ const SOURCE_ROOT = resolveSourceRoot(args.source);
 const MD_ROOT = resolveMarkdownRoot(SOURCE_ROOT, args.md || 'markdown');
 const QA_ROOT = path.join(SOURCE_ROOT, args.qa || 'qa');
 const PUBLIC_ROOT = path.resolve(process.cwd(), args.output || 'public');
-const OUTPUT = path.join(PUBLIC_ROOT, 'content.enc.json');
+const ENCRYPT_CONTENT = parseBoolean(args['encrypt-content'] ?? args.encrypt, true);
+const OUTPUT = path.join(PUBLIC_ROOT, ENCRYPT_CONTENT ? 'content.enc.json' : 'content.json');
 const PAGE_OUTPUT_ROOT = path.join(PUBLIC_ROOT, 'content', 'pages');
 
 function cleanName(name) {
@@ -121,7 +128,7 @@ function buildTree(dir, relativePath = '') {
     }).filter(Boolean);
 }
 
-async function collectAndEncryptPages(dir, password, relativePath = '') {
+async function collectAndPersistPages(dir, password, relativePath = '') {
     const pages = {};
     if (!fs.existsSync(dir)) return pages;
 
@@ -131,15 +138,21 @@ async function collectAndEncryptPages(dir, password, relativePath = '') {
     for (const entry of entries) {
         const relative = relativePath ? `${relativePath}/${entry.name}` : entry.name;
         if (entry.isDirectory()) {
-            Object.assign(pages, await collectAndEncryptPages(path.join(dir, entry.name), password, relative));
+            Object.assign(pages, await collectAndPersistPages(path.join(dir, entry.name), password, relative));
         } else if (entry.name.endsWith('.md')) {
             const slug = relative.replace(/\.md$/, '');
             const plain = fs.readFileSync(path.join(dir, entry.name), 'utf-8');
-            const encrypted = await encrypt(plain, password);
-            const outputRel = `content/pages/${slug}.enc.json`;
+            const outputRel = `content/pages/${slug}.${ENCRYPT_CONTENT ? 'enc.json' : 'json'}`;
             const outputAbs = path.join(PUBLIC_ROOT, ...outputRel.split('/'));
             fs.mkdirSync(path.dirname(outputAbs), { recursive: true });
-            fs.writeFileSync(outputAbs, JSON.stringify(encrypted));
+
+            if (ENCRYPT_CONTENT) {
+                const encrypted = await encrypt(plain, password);
+                fs.writeFileSync(outputAbs, JSON.stringify(encrypted));
+            } else {
+                fs.writeFileSync(outputAbs, JSON.stringify({ text: plain }));
+            }
+
             pages[slug] = { path: outputRel };
         }
     }
@@ -230,7 +243,7 @@ async function main() {
     }
     fs.mkdirSync(PAGE_OUTPUT_ROOT, { recursive: true });
 
-    const pageIndex = await collectAndEncryptPages(MD_ROOT, password);
+    const pageIndex = await collectAndPersistPages(MD_ROOT, password);
 
     const bundle = { structure, pageIndex, qa };
     const plainJson = JSON.stringify(bundle);
@@ -239,14 +252,18 @@ async function main() {
     console.log(`  ✅ ${Object.keys(qa).length} QA sets`);
     console.log(`  📦 Bundle size: ${(plainJson.length / 1024).toFixed(1)} KB`);
 
-    console.log('🔐 Encrypting...');
-    const encrypted = await encrypt(plainJson, password);
-
     fs.mkdirSync(path.dirname(OUTPUT), { recursive: true });
-    fs.writeFileSync(OUTPUT, JSON.stringify(encrypted));
-
-    console.log(`✅ Encrypted bundle saved to ${OUTPUT}`);
-    console.log(`  📦 Encrypted size: ${(fs.statSync(OUTPUT).size / 1024).toFixed(1)} KB`);
+    if (ENCRYPT_CONTENT) {
+        console.log('🔐 Encrypting...');
+        const encrypted = await encrypt(plainJson, password);
+        fs.writeFileSync(OUTPUT, JSON.stringify(encrypted));
+        console.log(`✅ Encrypted bundle saved to ${OUTPUT}`);
+        console.log(`  📦 Encrypted size: ${(fs.statSync(OUTPUT).size / 1024).toFixed(1)} KB`);
+    } else {
+        fs.writeFileSync(OUTPUT, JSON.stringify(bundle));
+        console.log(`✅ Plain bundle saved to ${OUTPUT}`);
+        console.log(`  📦 Plain size: ${(fs.statSync(OUTPUT).size / 1024).toFixed(1)} KB`);
+    }
 }
 
 main().catch(e => { console.error(e); process.exit(1); });

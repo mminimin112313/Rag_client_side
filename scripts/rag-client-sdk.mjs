@@ -36,6 +36,12 @@ function run(command, args, cwd = process.cwd(), env = process.env) {
     if (result.status !== 0) throw new Error(`${command} exited with code ${result.status}`);
 }
 
+function runTimed(label, command, args, cwd = process.cwd(), env = process.env) {
+    const start = Date.now();
+    run(command, args, cwd, env);
+    return { label, ms: Date.now() - start };
+}
+
 function printUsage() {
     console.log(`
 rag-client-sdk
@@ -44,8 +50,8 @@ Usage:
   node scripts/rag-client-sdk.mjs init [--input ./rag-documents.json]
   node scripts/rag-client-sdk.mjs ingest --from ./raw-input --type json|jsonl|csv|md-dir|txt-dir [--out ./rag-documents.json]
   node scripts/rag-client-sdk.mjs validate [--input ./rag-documents.json]
-  node scripts/rag-client-sdk.mjs prepare [--source ./docs] [--md markdown] [--qa qa] [--output ./public] [--password ...] [--password-env WIKI_PASSWORD] [--encrypt-vectors true|false]
-  node scripts/rag-client-sdk.mjs prepare [--input ./rag-documents.json] [--output ./public] [--password ...] [--password-env WIKI_PASSWORD] [--encrypt-vectors true|false]
+  node scripts/rag-client-sdk.mjs prepare [--source ./docs] [--md markdown] [--qa qa] [--output ./public] [--password ...] [--password-env WIKI_PASSWORD] [--encrypt-content true|false] [--encrypt-vectors true|false] [--auto-tune true|false] [--dim 256] [--chunk-size 220] [--chunk-overlap 30]
+  node scripts/rag-client-sdk.mjs prepare [--input ./rag-documents.json] [--output ./public] [--password ...] [--password-env WIKI_PASSWORD] [--encrypt-content true|false] [--encrypt-vectors true|false] [--auto-tune true|false] [--dim 256] [--chunk-size 220] [--chunk-overlap 30]
   node scripts/rag-client-sdk.mjs build-wasm [--rust-source ../rag-gemma-candle-wasm] [--out ./public/pkg] [--docker true|false]
 
 Examples:
@@ -103,39 +109,54 @@ function main() {
         }
 
         const encryptVectors = toBool(args['encrypt-vectors'], true);
+        const encryptContent = toBool(args['encrypt-content'], true);
         if (args.input) {
             run(process.execPath, [
                 path.resolve('scripts/build-from-documents.mjs'),
                 `--input=${input}`,
                 `--output=${output}`,
                 `--password-env=${passwordEnvName}`,
+                `--encrypt-content=${encryptContent ? 'true' : 'false'}`,
                 `--encrypt-vectors=${encryptVectors ? 'true' : 'false'}`,
+                `--auto-tune=${toBool(args['auto-tune'], true) ? 'true' : 'false'}`,
+                ...(args.dim ? [`--dim=${args.dim}`] : []),
+                ...(args['chunk-size'] ? [`--chunk-size=${args['chunk-size']}`] : []),
+                ...(args['chunk-overlap'] ? [`--chunk-overlap=${args['chunk-overlap']}`] : []),
                 ...(password ? [`--password=${password}`] : []),
             ], process.cwd(), env);
         } else {
-            run(process.execPath, [
+            const t1 = runTimed('build-content', process.execPath, [
                 path.resolve('scripts/encrypt-content.mjs'),
                 `--source=${source}`,
                 `--md=${md}`,
                 `--qa=${qa}`,
                 `--output=${output}`,
+                `--encrypt-content=${encryptContent ? 'true' : 'false'}`,
                 `--password-env=${passwordEnvName}`,
                 ...(password ? [`--password=${password}`] : []),
             ], process.cwd(), env);
 
-            run(process.execPath, [
+            const t2 = runTimed('build-vectors', process.execPath, [
                 path.resolve('scripts/build-vector-db.mjs'),
                 `--source=${source}`,
                 `--md=${md}`,
                 `--output=${output}`,
                 '--out=vector-db.json',
-                '--dim=256',
-                '--chunk-size=220',
-                '--chunk-overlap=30',
+                `--dim=${args.dim || 256}`,
+                `--chunk-size=${args['chunk-size'] || 220}`,
+                `--chunk-overlap=${args['chunk-overlap'] || 30}`,
                 ...(encryptVectors ? ['--encrypt'] : []),
                 `--password-env=${passwordEnvName}`,
                 ...(password ? [`--password=${password}`] : []),
             ], process.cwd(), env);
+
+            const total = t1.ms + t2.ms;
+            const top = t1.ms >= t2.ms ? t1 : t2;
+            const ratio = total > 0 ? (top.ms / total) * 100 : 0;
+            console.log(`Stage timings(ms): ${t1.label}=${t1.ms}, ${t2.label}=${t2.ms}, total=${total}`);
+            if (ratio >= 45) {
+                console.log(`Bottleneck detected: ${top.label} (${ratio.toFixed(1)}% of total).`);
+            }
         }
 
         console.log('Prepared encrypted content + vector index.');
