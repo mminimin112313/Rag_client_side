@@ -1,0 +1,42 @@
+{
+  "name": "@mminimin112313/rag-client-side",
+  "version": "0.1.0",
+  "description": "Client-side RAG SDK with encrypted content pipeline, BM25-weighted retrieval, and optional Rust WASM embedding runtime.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./scripts/build-vector-db": "./scripts/build-vector-db.mjs",
+    "./scripts/encrypt-content": "./scripts/encrypt-content.mjs"
+  },
+  "files": [
+    "dist",
+    "scripts",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist",
+    "sdk:init": "node scripts/rag-client-sdk.mjs init",
+    "sdk:prepare": "node scripts/rag-client-sdk.mjs prepare",
+    "prepare:data": "node scripts/rag-client-sdk.mjs prepare"
+  },
+  "keywords": [
+    "rag",
+    "client-side",
+    "bm25",
+    "wasm",
+    "vector-search",
+    "nextjs",
+    "react"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}
